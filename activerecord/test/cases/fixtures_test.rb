@@ -16,6 +16,7 @@ require "models/doubloon"
 require "models/joke"
 require "models/matey"
 require "models/parrot"
+require "models/person"
 require "models/pirate"
 require "models/post"
 require "models/randomly_named_c1"
@@ -720,6 +721,42 @@ class FixturesBrokenRollbackTest < ActiveRecord::TestCase
     def load_fixtures(config)
       raise "argh"
     end
+end
+
+class FixturesResetTest < ActiveRecord::TestCase
+  class FixturesResetMock < ActiveRecord::TestCase
+    def blank_setup
+      @fixture_connections = [ActiveRecord::Base.connection]
+    end
+    alias_method :ar_setup_fixtures, :setup_fixtures
+    alias_method :setup_fixtures, :blank_setup
+    alias_method :setup, :blank_setup
+
+    def blank_teardown; end
+    alias_method :ar_teardown_fixtures, :teardown_fixtures
+    alias_method :teardown_fixtures, :blank_teardown
+    alias_method :teardown, :blank_teardown
+
+    fixtures :people
+
+    def run_test(in_transaction: )
+      self.class.use_transactional_tests = in_transaction
+      ar_setup_fixtures
+      assert_equal 3, Person.count
+      Person.delete_all
+      assert_equal 0, Person.count
+      ar_teardown_fixtures
+    end
+  end
+
+  FixturesResetTestA = Class.new(FixturesResetMock)
+  FixturesResetTestB = Class.new(FixturesResetMock)
+
+  def test_fixtures_are_reset_after_a_non_transactional_test
+    FixturesResetTestA.new('foo').run_test(in_transaction: true)
+    FixturesResetTestB.new('foo').run_test(in_transaction: false)
+    FixturesResetTestA.new('foo').run_test(in_transaction: true)
+  end
 end
 
 class LoadAllFixturesTest < ActiveRecord::TestCase
